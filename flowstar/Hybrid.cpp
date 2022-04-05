@@ -8829,15 +8829,15 @@ int HybridSystem::reach_hybrid(std::list<std::list<TaylorModelVec> > & flowpipes
 			else if(intersected_flowpipes.size() > 0)
 			{
 
-				//Code added by Rado
-			        printf("Entered a case that is not supported by Verisig (multiple intersected flowpipes). Exiting...\n");
+				// Code added by Rado
+			  printf("Entered a case that is not supported by Verisig (multiple intersected flowpipes).\n");
 				printf("\nInitial conditions:\n");
 				for(int i = 0; i < dnn::initialConds.size(); i++){
 				        printf("%s\n", dnn::initialConds[i].c_str());
 				}
-				exit(1);
+				//exit(1);
 				
-				//end of code added by Rado
+				// end of code added by Rado
 				
 				// aggregate the intersections
 				Flowpipe fpAggregation;
@@ -8864,7 +8864,7 @@ int HybridSystem::reach_hybrid(std::list<std::list<TaylorModelVec> > & flowpipes
 				// ==========test end==========
 */
 
-//				printf("intersected flowpipes = %d\n", (int)intersected_flowpipes.size());
+				printf("intersected flowpipes = %d\n", (int)intersected_flowpipes.size());
 
 
 				switch(aggregType[initMode][i])
@@ -8911,6 +8911,372 @@ int HybridSystem::reach_hybrid(std::list<std::list<TaylorModelVec> > & flowpipes
 //					tmvAggregation.normalize(doAggregation);
 //				}
 				
+				//Code added by Rado-Guillermo
+				//This is the reset map!
+				
+				std::vector<std::string> realVarNames;
+				Variables realStateVars;
+				realVarNames.push_back("local_t");
+				realStateVars.declareVar("local_t");
+
+				Flowpipe tempSaveFp;
+
+				TaylorModelVec tempTMV = transitions[initMode][i].resetMap.tmvReset;
+
+				for(int varInd = 0; varInd < stateVarNames.size(); varInd ++){
+
+				        realVarNames.push_back(stateVarNames[varInd]);
+					realStateVars.declareVar(stateVarNames[varInd]);
+				}	
+
+				//confusingly, this is the next mode name
+				std::string modeName = modeNames[transitions[initMode][i].targetID];
+
+				// this is the current mode name
+				std::string curModeName = modeNames[initMode];
+				
+				int numVars = realVarNames.size();
+
+				//this case deals with division resets
+				if(!strncmp(modeName.c_str(), "_div_", strlen("_div_"))){
+
+				        std::string varInd = "";
+
+					int curInd = 5;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+
+					int varStoreInd = std::stoi(varInd);
+
+					varInd = "";
+					curInd++;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+					int varDenInd = std::stoi(varInd);
+
+				        //I'm keeping the intC name, although c states are not used anymore
+					Interval intC;
+					
+					tmvAggregation.tms[varDenInd].intEval(intC, doAggregation);
+					
+					TaylorModel new_tm_reset;
+					div_reset(new_tm_reset, intC, varStoreInd, varDenInd, numVars);
+					
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].expansion = new_tm_reset.expansion;
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].remainder = new_tm_reset.remainder;
+
+				}
+
+				bool changedSec = false;
+				//this case deals with sec resets
+				if(!strncmp(modeName.c_str(), "_sec_", strlen("_sec_"))){
+
+				        std::string varInd = "";
+
+					int curInd = 5;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+					int varStoreInd = std::stoi(varInd);
+
+					varInd = "";
+					curInd++;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+					int varDenInd = std::stoi(varInd);
+				  
+				        //I'm keeping the intC name, although c states are not used anymore
+					Interval intC;
+					
+					tmvAggregation.tms[varDenInd].intEval(intC, doAggregation);
+
+					TaylorModel new_tm_reset;
+					sec_reset(new_tm_reset, intC, varStoreInd, varDenInd, numVars, tmvAggregation, doAggregation);
+
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].expansion = new_tm_reset.expansion;
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].remainder = new_tm_reset.remainder;
+				}
+
+				//this case deals with arctan resets
+				if(!strncmp(modeName.c_str(), "_arc_", strlen("_arc_"))){
+
+				        std::string varInd = "";
+
+					int curInd = 5;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+					int varStoreInd = std::stoi(varInd);
+
+					varInd = "";
+					curInd++;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+					int varDenInd = std::stoi(varInd);
+				  
+				        //I'm keeping the intC name, although c states are not used anymore
+					Interval intC;
+					
+					tmvAggregation.tms[varDenInd].intEval(intC, doAggregation);
+
+					TaylorModel new_tm_reset;
+					arc_reset(new_tm_reset, intC, varStoreInd, varDenInd, numVars);					
+					
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].expansion = new_tm_reset.expansion;
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].remainder = new_tm_reset.remainder;
+				}
+
+				//this case deals with tan resets
+				if(!strncmp(modeName.c_str(), "_tan_", strlen("_tan_"))){
+
+				        std::string varInd = "";
+
+					int curInd = 5;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+					int varStoreInd = std::stoi(varInd);
+
+					varInd = "";
+					curInd++;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+					int varDenInd = std::stoi(varInd);
+					std::string varDenName = stateVarNames[varDenInd];
+				  
+				        //I'm keeping the intC name, although c states are not used anymore
+					Interval intC;
+					
+					tmvAggregation.tms[varDenInd].intEval(intC, doAggregation);
+
+					TaylorModel new_tm_reset;
+				        tan_reset(new_tm_reset, intC, varStoreInd, varDenInd, numVars);
+										
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].expansion = new_tm_reset.expansion;
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].remainder = new_tm_reset.remainder;
+				        
+				}
+				
+				//this case deals with cos resets
+				if(!strncmp(modeName.c_str(), "_cos_", strlen("_cos_"))){
+
+				        std::string varInd = "";
+
+					int curInd = 5;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+					int varStoreInd = std::stoi(varInd);
+
+					varInd = "";
+					curInd++;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+					int varDenInd = std::stoi(varInd);
+					std::string varDenName = stateVarNames[varDenInd];
+				  
+				        //I'm keeping the intC name, although c states are not used anymore
+					Interval intC;
+					
+					tmvAggregation.tms[varDenInd].intEval(intC, doAggregation);
+
+					TaylorModel new_tm_reset;
+				        cos_reset(new_tm_reset, intC, varStoreInd, varDenInd, numVars);					
+										
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].expansion = new_tm_reset.expansion;
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].remainder = new_tm_reset.remainder;
+					
+				}
+
+				//this case deals with sin resets
+				if(!strncmp(modeName.c_str(), "_sin_", strlen("_sin_"))){
+
+				        std::string varInd = "";
+
+					int curInd = 5;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+					int varStoreInd = std::stoi(varInd);
+
+					varInd = "";
+					curInd++;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+					int varDenInd = std::stoi(varInd);
+				  
+				        //I'm keeping the intC name, although c states are not used anymore
+					Interval intC;
+					
+					tmvAggregation.tms[varDenInd].intEval(intC, doAggregation);
+
+					TaylorModel new_tm_reset;
+				        sin_reset(new_tm_reset, intC, varStoreInd, varDenInd, numVars);
+										
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].expansion = new_tm_reset.expansion;
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].remainder = new_tm_reset.remainder;
+				        					
+				}				
+				
+				//this case deals with sqrt resets
+				if(!strncmp(modeName.c_str(), "_sqrt_", strlen("_sqrt_"))){
+
+				        std::string varInd = "";
+
+					int curInd = 6;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+					int varStoreInd = std::stoi(varInd);
+
+					varInd = "";
+					curInd++;
+					for(; modeName[curInd] != '_'; curInd++){
+					        varInd = varInd + modeName[curInd];
+					}
+					int varDenInd = std::stoi(varInd);
+				  
+				        //I'm keeping the intC name, although c states are not used anymore
+					Interval intC;
+					
+					tmvAggregation.tms[varDenInd].intEval(intC, doAggregation);
+
+					TaylorModel new_tm_reset;
+				        sqrt_reset(new_tm_reset, intC, varStoreInd, varDenInd, numVars);				 
+
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].expansion = new_tm_reset.expansion;
+					transitions[initMode][i].resetMap.tmvReset.tms[varStoreInd].remainder = new_tm_reset.remainder;
+					
+				}
+
+				// check if plant states are reset
+				// this is necessary because if states
+				// are reset, then the stored
+				// flowpipes are no longer valid
+
+				//first, check if there exist stored flowpipes in the first place
+				if(dnn::saved_plant_states.find(dnn::curBranchId) != dnn::saved_plant_states.end()){
+
+				        if(transitions[initMode][i].resetMap.tmvReset.tms.size() > stateVarNames.size()){
+					        printf("Something is wrong. Not all resets are specified. Exiting...\n");
+						exit(1);
+					}
+				  
+				        for(int resetInd = 0; resetInd < transitions[initMode][i].resetMap.tmvReset.tms.size(); resetInd++){
+
+					        //this assumes that all states start with an x or a y
+					        if(stateVarNames[resetInd][0] == 'y' || stateVarNames[resetInd][0] == 'x'){
+
+						        TaylorModel stateReset = transitions[initMode][i].resetMap.tmvReset.tms[resetInd];
+							Monomial stateResetMon = stateReset.expansion.monomials.front();
+
+							// only keep stored flowpipes if states are reset to themselves
+							if(stateReset.expansion.monomials.size() == 1  &&
+							   stateResetMon.degree() == 1 &&
+							   stateResetMon.getDegrees()[resetInd + 1] == 1 &&
+							   stateResetMon.getCoefficient().inf() == 1.0 &&
+							   stateResetMon.getCoefficient().sup() == 1.0 &&
+							   stateReset.remainder.width() == 0){
+
+							        //keep stored flowpipes
+							}
+							else{//erase flowpipes
+							        dnn::saved_plant_states.erase(dnn::curBranchId);
+							}
+						}
+					  
+					}
+				}
+
+				// if mode name starts with _cont_, use second-to-last flowpipe since last one is degenerate
+				// NB: if a reset happens, then use the last flowpipe
+				if(!strncmp(curModeName.c_str(), "_cont_", strlen("_cont_"))){
+
+				        Interval intOne(1.0, 1.0);
+					bool all_identity = true;
+
+				        for(int kk = 0; kk < transitions[initMode][i].resetMap.tmvReset.tms.size(); kk++){
+				                if(stateVarNames[kk][0] == 'y' || stateVarNames[kk][0] == 'x'){
+						        if(transitions[initMode][i].resetMap.tmvReset.tms[kk].expansion.monomials.size() == 1){
+							        Monomial m = *transitions[initMode][i].resetMap.tmvReset.tms[kk].expansion.monomials.begin();
+
+								if(m.getCoefficient().subseteq(intOne) && m.degree() == 1 && m.getDegree(kk+1) == 1){
+								        // do nothing
+								}
+								else{
+								        all_identity = false;
+									break;
+								}
+							}
+							else{
+							        all_identity = false;
+								break;
+							}
+						}
+					}
+
+				        if(dnn::saved_plant_tmv.find(dnn::curBranchId) != dnn::saved_plant_tmv.end() && all_identity){
+					        tmvAggregation = dnn::saved_plant_tmv[dnn::curBranchId];
+					}
+
+				}
+
+				// /*
+				//   this case deals with continuous modes where the plant 
+				//   states are temporarily replaced with interval approximations
+				//  */
+				if(!strncmp(curModeName.c_str(), "_reset_", strlen("_reset_"))){
+
+					//X0 stores the interval approximations for the f states only
+					std::vector<Interval> X0(tmvAggregation.tms.size());
+					
+					std::vector<Interval> all_ranges;
+					tmvAggregation.intEval(all_ranges, doAggregation);
+
+					// this is a roundabout way of doing things but I'd rather let
+					//Flow* APIs to handle low-level normalizations, etc.
+					std::vector<bool> states_to_change(tmvAggregation.tms.size());
+
+					bool largeRemainder = false;
+
+					//NB: this only works for state names that begin with y or x
+					for(int varInd = 0; varInd < tmvAggregation.tms.size(); varInd++){
+					        if(stateVarNames[varInd][0] == 'y' || stateVarNames[varInd][0] == 'x'){
+						          states_to_change[varInd] = true;
+							  X0[varInd] = all_ranges[varInd];
+
+							  if(tmvAggregation.tms[varInd].remainder.width() > 0.000001 &&
+							     tmvAggregation.tms[varInd].remainder.width() > 0.01 * all_ranges[varInd].width()){
+						  
+								  largeRemainder = true;
+							  }
+						}
+					}
+
+					if(largeRemainder){
+					        Flowpipe tempFP(X0, intZero);
+						
+						for(int varInd = 0; varInd < tmvAggregation.tms.size(); varInd++){
+						        if(!states_to_change[varInd]){
+							        tempFP.tmv.tms[varInd] = tmvAggregation.tms[varInd];
+								tempFP.tmvPre.tms[varInd] = tmvAggregation.tms[varInd];
+								tempFP.domain[varInd + 1] = doAggregation[varInd + 1];//unused
+							}
+						}
+						
+						tmvAggregation = tempFP.tmvPre;
+					  }
+				}				
+
+				//End of code added by Rado-Guillermo
+
 				//reset map
 				TaylorModelVec tmvImage;
 				transitions[initMode][i].resetMap.reset(tmvImage, tmvAggregation, doAggregation, globalMaxOrder, cutoff_threshold);
@@ -8943,7 +9309,193 @@ int HybridSystem::reach_hybrid(std::list<std::list<TaylorModelVec> > & flowpipes
 					fpAggregation.tmv = tmvTemp;
 					fpAggregation.tmvPre = tmvImage;
 					fpAggregation.domain = doAggregation;
-				}				
+				}
+
+
+				//Code added by Rado-Guillermo
+
+				/*
+				  This is currently after the Flow* reset in order to not worry about normalizing the flowpipes
+				 */
+				if(!strncmp(modeName.c_str(), "DNN", strlen("DNN"))){
+
+					gettimeofday(&beginNN, NULL);
+
+					Flowpipe resultFP;
+
+					dnn_reachability::compute_dnn_reachability(resultFP, tmvImage, fpAggregation,
+										   modeName, stateVarNames, realStateVars, bPrint);
+
+					fpAggregation = resultFP;
+
+					gettimeofday(&endNN, NULL);
+					double elapsedSecs = (endNN.tv_sec - beginNN.tv_sec) + (endNN.tv_usec - beginNN.tv_usec) / 1000000.0;
+					dnn::dnn_runtime += elapsedSecs;	
+
+				}
+
+				// /*
+				//   this case deals with continuous modes where the plant 
+				//   states are temporarily replaced with interval approximations
+				//  */
+				if(!strncmp(curModeName.c_str(), "_cont_", strlen("_cont_"))){
+
+					//X0 stores the interval approximations for the f states only
+					std::vector<Interval> X0(fpAggregation.tmv.tms.size());
+					
+					std::vector<Interval> all_ranges;
+					fpAggregation.intEval(all_ranges, cutoff_threshold);
+
+					// this is a roundabout way of doing things but I'd rather let
+					//Flow* APIs to handle low-level normalizations, etc.
+					std::vector<bool> states_to_change(fpAggregation.tmv.tms.size());
+
+					bool largeRemainder = false;
+
+					//NB: this only works for state names that begin with y or x
+					for(int varInd = 0; varInd < fpAggregation.tmv.tms.size(); varInd++){
+					        if(stateVarNames[varInd][0] == 'y' || stateVarNames[varInd][0] == 'x'){
+						          states_to_change[varInd] = true;
+							  X0[varInd] = all_ranges[varInd];
+
+							  if(fpAggregation.tmvPre.tms[varInd].remainder.width() > 0.000001 &&
+							     fpAggregation.tmvPre.tms[varInd].remainder.width() > 0.01 * all_ranges[varInd].width()){
+						  
+								  largeRemainder = true;
+							  }
+						}
+					}
+
+					if(largeRemainder){
+					        Flowpipe tempFP(X0, intZero);
+						
+						for(int varInd = 0; varInd < fpAggregation.tmv.tms.size(); varInd++){
+						        if(!states_to_change[varInd]){
+							        tempFP.tmv.tms[varInd] = fpAggregation.tmv.tms[varInd];
+								tempFP.tmvPre.tms[varInd] = fpAggregation.tmvPre.tms[varInd];
+								tempFP.domain[varInd + 1] = fpAggregation.domain[varInd + 1];
+							}
+						}
+						
+						fpAggregation = Flowpipe(tempFP);
+					  }
+				}
+
+				/*
+				  this case deals with modes that load Taylor model descriptions of plant states
+				 */
+				if(!strncmp(modeName.c_str(), "_load_", strlen("_load_")) &&
+				   dnn::saved_plant_states.find(dnn::curBranchId) != dnn::saved_plant_states.end()){
+
+					// if(dnn::saved_plant_states.find(branchId) != dnn::saved_plant_states.end())
+					//     printf("YES!\n");
+				  
+				        Flowpipe curFP = dnn::saved_plant_states[dnn::curBranchId];
+
+					std::vector<Interval> all_ranges;
+				        fpAggregation.intEval(all_ranges, cutoff_threshold);
+
+					/*
+					  this boolean is used to determined whether to just
+					  keep the interval approximation (if Taylor model remainders are too large)
+					 */
+					bool largeRemainder = false;					
+				  
+				        //NB: this currently assumes all state names begin with y or x
+					for(int varInd = 0; varInd < tmvAggregation.tms.size(); varInd++){
+					  
+					        if(stateVarNames[varInd][0] != 'y' && stateVarNames[varInd][0] != 'x'){
+
+						        curFP.tmv.tms[varInd] = fpAggregation.tmv.tms[varInd];
+						        curFP.tmvPre.tms[varInd] = fpAggregation.tmvPre.tms[varInd];
+						        curFP.domain[varInd + 1] = fpAggregation.domain[varInd + 1];
+				                }
+						else{
+						        if(curFP.tmvPre.tms[varInd].remainder.width() > 0.000001 &&
+							   curFP.tmvPre.tms[varInd].remainder.width() > 0.01 * all_ranges[varInd].width()){
+							        largeRemainder = true;
+				                        }
+				                }
+				        }
+
+					if(!largeRemainder)
+					        fpAggregation = Flowpipe(curFP);
+					
+				}
+
+				/*
+				  this case deals with modes that save Taylor model descriptions of plant states
+				  and temporarily replace them with interval approximations
+				 */
+				if(!strncmp(curModeName.c_str(), "_store_", strlen("_store_"))){
+
+					//X0 stores the interval approximations for the f states only
+					std::vector<Interval> X0(tmvAggregation.tms.size());
+
+					//initialize the saved states flowpipe to 0 taylor models initially
+					Flowpipe newSaveFP = Flowpipe(X0, intZero);
+					
+					std::vector<Interval> all_ranges;
+					fpAggregation.intEval(all_ranges, cutoff_threshold);
+
+					//NB: this currently assumes all state names begin with y or x
+					for(int varInd = 0; varInd < tmvAggregation.tms.size(); varInd++){
+					        if(stateVarNames[varInd][0] == 'y' || stateVarNames[varInd][0] == 'x'){
+						  
+				                        Interval intC = all_ranges[varInd];
+						        tmvAggregation.tms[varInd].intEval(intC, doAggregation);
+							
+							X0[varInd] = intC;	
+						}
+					}
+					Flowpipe tempFP(X0, intZero);
+					
+					for(int varInd = 0; varInd < tmvAggregation.tms.size(); varInd++){
+					        if(stateVarNames[varInd][0] != 'y' && stateVarNames[varInd][0] != 'x'){
+
+						        tempFP.tmv.tms[varInd] = fpAggregation.tmv.tms[varInd];
+						        tempFP.tmvPre.tms[varInd] = fpAggregation.tmvPre.tms[varInd];
+						        tempFP.domain[varInd + 1] = fpAggregation.domain[varInd + 1];
+						}
+					}
+
+				        //NB: this currently assumes all state names begin with y or x
+					for(int varInd = 0; varInd < tmvAggregation.tms.size(); varInd++){
+					        if(stateVarNames[varInd][0] == 'y' || stateVarNames[varInd][0] == 'x'){
+
+						        newSaveFP.tmv.tms[varInd] = fpAggregation.tmv.tms[varInd];
+						        newSaveFP.tmvPre.tms[varInd] = fpAggregation.tmvPre.tms[varInd];
+						        newSaveFP.domain[varInd + 1] = fpAggregation.domain[varInd + 1];
+						}
+					}
+
+					if(numBranches == 0){
+					        dnn::saved_plant_states[dnn::curBranchId] = Flowpipe(newSaveFP);
+					}
+					else{
+						dnn::saved_plant_states[dnn::totalNumBranches + 1] = Flowpipe(newSaveFP);
+					}
+					fpAggregation = Flowpipe(tempFP);
+				}								
+								
+				//print state ranges after reset
+				if(bPrint){
+				        std::vector<Interval> all_ranges;
+					fpAggregation.intEval(all_ranges, cutoff_threshold);
+					TaylorModelVec tmv_printing;
+					fpAggregation.composition(tmv_printing, cutoff_threshold);				  
+				        for(int varInd = 0; varInd < transitions[initMode][i].resetMap.tmvReset.tms.size(); varInd ++){
+				  
+					        printf("%s bounds after reset: [%13.10f, %13.10f]\n",
+						       stateVarNames[varInd].c_str(), all_ranges[varInd].inf(), all_ranges[varInd].sup());
+						
+						printf("%s remainder after reset: [%13.10f, %13.10f]\n",
+						       stateVarNames[varInd].c_str(), tmv_printing.tms[varInd].remainder.inf(),
+						       tmv_printing.tms[varInd].remainder.sup());
+					}
+				}
+				
+				//end of code added by Rado-Guillermo
 
 				startTime += newTimePassed;
 				if(startTime < time - THRESHOLD_HIGH)
@@ -8959,6 +9511,23 @@ int HybridSystem::reach_hybrid(std::list<std::list<TaylorModelVec> > & flowpipes
 					node->children.push_back(child);
 
 					nodeQueue.push_back(child);				
+
+					//Code added by Rado-Guillermo
+					if(numBranches == 0){
+					        branchIdQueue.push_back(dnn::curBranchId);
+					}
+					else{//new branch
+					        dnn::totalNumBranches++;
+						branchIdQueue.push_back(dnn::totalNumBranches);
+
+						//if nothing has been saved yet, then don't store anything
+						if(dnn::saved_plant_states.find(dnn::curBranchId) != dnn::saved_plant_states.end()){
+						        dnn::saved_plant_states[dnn::totalNumBranches] =
+								  dnn::saved_plant_states[dnn::curBranchId];
+						}
+					}
+					numBranches++;
+					//end of code added by Rado-Guillermo
 
 				}
 			}
